@@ -6,27 +6,20 @@
 //
 
 import SwiftUI
-import EventKit
 
 struct EventView: View {
-    @EnvironmentObject private var calendarManager: CalendarManager
     @Environment(\.dismiss) private var dismiss
+    @State private var isAlert = false
     
-    @State private var title: String = ""
-    @State private var isAllDay: Bool = false
-    @State private var startDate: Date = .now
-    @State private var endDate: Date = .now.adding(days: 1)
+    private var vm: ContentViewModel
+    private var event: EventModel
     
-    var event: EKEvent?
-    
-    init(event: EKEvent?) {
-        self.event = event
-        
-        if let event = event {
-            _title = State(initialValue: event.title)
-            _isAllDay = State(initialValue: event.isAllDay)
-            _startDate = State(initialValue: event.startDate)
-            _endDate = State(initialValue: event.endDate)
+    init(vm: ContentViewModel) {
+        self.vm = vm
+        if self.vm.isCreateMode {
+            event = EventModel()
+        } else {
+            event = EventModel(event: self.vm.selectedEvent!)
         }
     }
     
@@ -34,37 +27,44 @@ struct EventView: View {
         NavigationView {
             Form {
                 Section(header: Text("이벤트 정보")) {
-                    TextField("제목", text: $title)
-                    Toggle("종일", isOn: $isAllDay)
+                    TextField("제목", text: Bindable(event).title)
+                    Toggle("종일", isOn: Bindable(event).isAllDay)
                     
-                    if isAllDay {
-                        DatePicker("날짜", selection: $startDate, displayedComponents: .date)
+                    if event.isAllDay {
+                        DatePicker("날짜", selection: Bindable(event).startDate, displayedComponents: .date)
                     } else {
-                        DatePicker("시작 시간", selection: $startDate)
-                        DatePicker("종료 시간", selection: $endDate)
+                        DatePicker("시작 시간", selection: Bindable(event).startDate)
+                        DatePicker("종료 시간", selection: Bindable(event).endDate, in: event.startDate...)
                     }
                 }
             }
-            .safeAreaInset(edge: .bottom){
+            .safeAreaInset(edge: .bottom) {
                 removeButton
-                    .opacity(event == nil ? 0 : 1)
+                    .opacity(vm.isCreateMode ? 0 : 1)
             }
-            .navigationTitle(event == nil ? "이벤트 생성" : "이벤트 수정")
+            .navigationTitle(vm.isCreateMode ? "이벤트 생성" : "이벤트 수정")
             .navigationBarItems(
                 leading: Button("취소") {
                     dismiss()
                 },
                 trailing: Button("저장") {
-                    saveEvent()
+                    vm.saveEvent(event: event)
+                    dismiss()
                 }
+                .disabled(event.title.isEmpty)
             )
         }
+        .alert("삭제",
+               isPresented: $isAlert,
+               actions: { alertButtons },
+               message: { Text("삭제하시겠습니까?") })
     }
-    
+}
+
+extension EventView {
     var removeButton: some View {
         Button(action: {
-            try? calendarManager.removeEvent(event!)
-            dismiss()
+            isAlert = true
         }, label: {
             Image(systemName: "trash.fill")
         })
@@ -72,16 +72,15 @@ struct EventView: View {
         .padding()
     }
     
-    private func saveEvent() {
-        do {
-            if let existingEvent = event {
-                try calendarManager.updateEvent(existingEvent, title: title, startDate: startDate, endDate: isAllDay ? startDate.endOfDay : endDate, isAllDay: isAllDay)
-            } else {
-                try calendarManager.addEvent(title: title, startDate: startDate, endDate: isAllDay ? startDate.endOfDay : endDate)
-            }
+    @ViewBuilder
+    var alertButtons: some View {
+        Button("확인") {
+            vm.removeEvent()
             dismiss()
-        } catch {
-            print("Error saving event: \(error.localizedDescription)")
+        }
+        Button("취소") {
+            isAlert = false
         }
     }
+
 }

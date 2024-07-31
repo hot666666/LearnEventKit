@@ -6,16 +6,9 @@
 //
 
 import SwiftUI
-import EventKit
 
 struct ContentView: View {
-    @EnvironmentObject private var calendarManager: CalendarManager
-    
-    @State private var calendars: [EKCalendar] = []
-    @State private var events: [EKEvent] = []
-    @State private var selectedCalendar: EKCalendar?
-    @State private var selectedEvent: EKEvent?
-    @State private var isPresented = false
+    @State var vm: ContentViewModel
     
     var body: some View {
         VStack{
@@ -23,30 +16,28 @@ struct ContentView: View {
                 calendarsView
                 Spacer()
                 addButton
-                    .disabled(!calendarManager.isAuthorized)
+                    .disabled(!vm.calendarManager.isAuthorized)
             }
             .padding()
             
-            eventsView
+            eventsListView
         }
         .onAppear {
-            calendars = calendarManager.fetchCalendars()
-            selectedCalendar = calendars.first(where: { $0.title == "캘린더"})
+            vm.loadCalendars()
         }
-        .onChange(of: selectedCalendar) { _, newValue in
-            if let calendar = newValue {
-                events = calendarManager.fetchEvents(startDate: .now, endDate: .now.adding(months: 1), calendars: [calendar])
-            }
+        .onChange(of: vm.selectedCalendar) { _, newValue in
+            vm.loadEvents(in: newValue)
         }
-        .sheet(isPresented: $isPresented) {
-            EventView(event: selectedEvent)
+        .sheet(isPresented: $vm.isPresented) {
+            EventView(vm: vm)
         }
     }
-    
+}
+ 
+extension ContentView {
     var addButton: some View {
         Button(action: {
-            selectedEvent = nil
-            isPresented = true
+            vm.loadEventView()
         }, label: {
             Image(systemName: "plus")
         })
@@ -54,18 +45,18 @@ struct ContentView: View {
     }
     
     var calendarsView: some View {
-        Picker("Select Calendar", selection: $selectedCalendar) {
-            ForEach(calendars, id: \.self) { calendar in
+        Picker("Select Calendar", selection: $vm.selectedCalendar) {
+            ForEach(vm.calendars, id: \.self) { calendar in
                 Text(calendar.title)
-                    .tag(calendar as EKCalendar?)
+                    .tag(calendar)
             }
         }
         .pickerStyle(.menu)
     }
     
-    var eventsView: some View {
+    var eventsListView: some View {
         List {
-            ForEach(events, id: \.self.eventIdentifier) { event in
+            ForEach(vm.events, id: \.self.id) { event in
                 VStack(alignment: .leading) {
                     Text(event.title)
                         .font(.title3)
@@ -79,8 +70,7 @@ struct ContentView: View {
                     .font(.subheadline)
                 }
                     .onTapGesture {
-                        selectedEvent = event
-                        isPresented = true
+                        vm.loadEventView(for: event)
                     }
             }
         }
@@ -88,6 +78,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
-        .environmentObject(CalendarManager())
+    ContentView(vm: .init(calendarManager: .init()))
 }

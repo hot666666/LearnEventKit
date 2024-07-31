@@ -63,57 +63,41 @@ extension CalendarManager {
         eventStore.calendars(for: .event)
     }
     
-    func fetchEvents(startDate: Date, endDate: Date, calendars: [EKCalendar]? = nil) -> [EKEvent] {
+    func fetchEvents(startDate: Date, endDate: Date, calendars: [EKCalendar]? = nil) -> [EventModel] {
         let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
-        return eventStore.events(matching: predicate)
+        let events = eventStore.events(matching: predicate)
+        return events.map { EventModel(event: $0) }
     }
     
-    func addEvent(title: String, startDate: Date, endDate: Date, calendar: EKCalendar?=nil) throws {
-        let event = EKEvent(eventStore: eventStore)
+    func addEvent(event: EventModel, calendar: EKCalendar? = nil) throws -> EventModel {
+        let ekEvent = EKEvent(eventStore: eventStore)
+        ekEvent.title = event.title
+        ekEvent.startDate = event.startDate
+        ekEvent.endDate = event.endDate
+        ekEvent.isAllDay = event.isAllDay
+        ekEvent.calendar = calendar ?? eventStore.defaultCalendarForNewEvents
+        try eventStore.save(ekEvent, span: .thisEvent)
         
-        event.title = title
-        event.startDate = startDate
-        event.endDate = endDate
-        event.calendar = calendar ?? eventStore.defaultCalendarForNewEvents
-
-        do {
-            try eventStore.save(event, span: .thisEvent)
-        } catch {
-            throw error
-        }
+        event.id = ekEvent.eventIdentifier
+        return event
     }
     
     // TODO: - update calendar
-    func updateEvent(_ event: EKEvent, title: String, startDate: Date, endDate: Date, isAllDay: Bool) throws {
-        event.title = title
-        event.isAllDay = isAllDay
-        event.startDate = isAllDay ? startDate.startOfDay : startDate
-        event.endDate = isAllDay ? endDate.endOfDay : endDate
-
-        do {
-            try eventStore.save(event, span: .thisEvent)
-        } catch {
-            throw error
+    func updateEvent(_ eventModel: EventModel) throws {
+        guard let ekEvent = eventStore.event(withIdentifier: eventModel.id) else { return }
+        ekEvent.title = eventModel.title
+        ekEvent.startDate = eventModel.startDate
+        ekEvent.isAllDay = eventModel.isAllDay
+        if ekEvent.isAllDay {
+            ekEvent.endDate = eventModel.startDate.endOfDay
+        } else {
+            ekEvent.endDate = eventModel.endDate
         }
+        try eventStore.save(ekEvent, span: .thisEvent)
     }
     
-    func removeEvents(_ events: [EKEvent]) throws {
-        do {
-            try events.forEach { event in
-                try _removeEvent(event)
-            }
-            try eventStore.commit()
-        } catch {
-            eventStore.reset()
-            throw error
-        }
-    }
-    
-    func removeEvent(_ event: EKEvent) throws {
-        try eventStore.remove(event, span: .thisEvent, commit: true)
-    }
-    
-    private func _removeEvent(_ event: EKEvent) throws {
-        try eventStore.remove(event, span: .thisEvent, commit: false)
+    func removeEvent(_ eventModel: EventModel) throws {
+        guard let ekEvent = eventStore.event(withIdentifier: eventModel.id) else { return }
+        try eventStore.remove(ekEvent, span: .thisEvent)
     }
 }

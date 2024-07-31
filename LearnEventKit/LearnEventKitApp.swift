@@ -16,7 +16,7 @@ struct LearnEventKitApp: App {
         WindowGroup {
             Group {
                 if calendarManager.isAuthorized {
-                    ContentView()
+                    ContentView(vm: .init(calendarManager: calendarManager))
                         .environmentObject(calendarManager)
                 } else {
                     Text("NEED AUTHORIZATION")
