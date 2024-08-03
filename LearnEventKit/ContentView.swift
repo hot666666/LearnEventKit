@@ -19,6 +19,7 @@ struct ContentView: View {
                     .disabled(!vm.calendarManager.isAuthorized)
             }
             .padding()
+            .padding(.top, 20)
             
             eventsListView
         }
@@ -54,7 +55,13 @@ extension ContentView {
         .pickerStyle(.menu)
     }
     
+    @ViewBuilder
     var eventsListView: some View {
+        if vm.events.isEmpty {
+            Text("기간 내 이벤트가 존재하지 않습니다")
+                .containerRelativeFrame(.vertical)
+                .foregroundColor(.secondary)
+        }
         List {
             ForEach(vm.events, id: \.self.id) { event in
                 VStack(alignment: .leading) {
