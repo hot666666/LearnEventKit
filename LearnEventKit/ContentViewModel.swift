@@ -27,7 +27,7 @@ class ContentViewModel {
     
     func loadCalendars() {
         calendars = calendarManager.fetchCalendars()
-        selectedCalendar = calendars.first(where: { $0.title == "캘린더" })
+        selectedCalendar = calendars.first(where: { $0.title == "캘린더" || $0.title == "Calendar" })
     }
     
     func loadEvents(in newValue: EKCalendar?) {

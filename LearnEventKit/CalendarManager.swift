@@ -71,12 +71,17 @@ extension CalendarManager {
     
     func addEvent(event: EventModel, calendar: EKCalendar? = nil) throws -> EventModel {
         let ekEvent = EKEvent(eventStore: eventStore)
+        
         ekEvent.title = event.title
-        ekEvent.startDate = event.startDate
-        ekEvent.endDate = event.endDate
         ekEvent.isAllDay = event.isAllDay
+        ekEvent.startDate = event.isAllDay ? event.startDate.startOfDay : event.startDate
+        ekEvent.endDate = event.isAllDay ? event.startDate.endOfDay : event.endDate
         ekEvent.calendar = calendar ?? eventStore.defaultCalendarForNewEvents
         try eventStore.save(ekEvent, span: .thisEvent)
+        
+        if ekEvent.isAllDay {
+            event.endDate = ekEvent.endDate
+        }
         
         event.id = ekEvent.eventIdentifier
         return event
